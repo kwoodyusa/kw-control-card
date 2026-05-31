@@ -154,13 +154,13 @@ class KWControlCard extends HTMLElement {
         ${shellStyles(sz)}
         .card { padding: ${sz.pad}; cursor: default; }
         .track {
-          position: relative; height: 36px; border-radius: 18px;
+          position: relative; height: 18px; border-radius: 9px;
           background: rgba(255,255,255,0.07);
           cursor: ew-resize; user-select: none;
         }
         .fill {
           position: absolute; left: 0; top: 0; bottom: 0;
-          width: ${val}%; border-radius: 18px;
+          width: ${val}%; border-radius: 9px;
           background: ${lightColor};
           opacity: ${isOn ? 0.5 : 0};
           pointer-events: none;
@@ -168,27 +168,27 @@ class KWControlCard extends HTMLElement {
         .lbl {
           position: absolute; inset: 0;
           display: flex; align-items: center;
-          padding: 0 44px;
+          padding: 0 22px;
           justify-content: center;
-          font-size: ${sz.name}px; font-weight: 600;
+          font-size: ${sz.sub}px; font-weight: 600;
           color: var(--primary-text-color, #e8e8e8);
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
           pointer-events: none; z-index: 2;
         }
         .thumb {
           position: absolute; top: 50%;
-          left: clamp(2px, calc(${val}% - 18px), calc(100% - 36px));
+          left: clamp(1px, calc(${val}% - 9px), calc(100% - 18px));
           transform: translateY(-50%);
-          width: 32px; height: 32px; border-radius: 50%;
+          width: 16px; height: 16px; border-radius: 50%;
           background: rgba(15,17,28,0.85);
           display: flex; align-items: center; justify-content: center;
           z-index: 3; pointer-events: none;
           box-shadow: ${isOn
-            ? `0 0 8px ${lightColor}, 0 0 18px ${lightColor}55`
+            ? `0 0 6px ${lightColor}, 0 0 12px ${lightColor}55`
             : '0 1px 4px rgba(0,0,0,0.5)'};
         }
         .thumb ha-icon {
-          --mdc-icon-size: 18px;
+          --mdc-icon-size: 11px;
           color: ${isOn ? lightColor : 'rgba(255,255,255,0.25)'};
         }
       </style>
@@ -213,7 +213,7 @@ class KWControlCard extends HTMLElement {
     const updateUI = (pct) => {
       fill.style.width = pct + '%';
       fill.style.opacity = pct > 0 ? '0.5' : '0';
-      thumb.style.left = `clamp(2px, calc(${pct}% - 18px), calc(100% - 36px))`;
+      thumb.style.left = `clamp(1px, calc(${pct}% - 9px), calc(100% - 18px))`;
     };
 
     let startX = 0, moved = false;
