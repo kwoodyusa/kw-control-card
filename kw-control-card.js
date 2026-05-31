@@ -1,4 +1,4 @@
-// kw-control-card.js — v1.1.5
+// kw-control-card.js — v1.1.6
 // Uniform control card for lights, fans, media players, and cameras.
 // Designed to inherit Frosted Glass Dark theme CSS variables automatically.
 //
@@ -18,7 +18,7 @@
 //     - label: High
 //       pct: 100
 
-const KW_CARD_VERSION = '1.1.5';
+const KW_CARD_VERSION = '1.1.6';
 
 // ─── Size presets ───────────────────────────────────────────────────────────────────
 const SIZES = {
@@ -252,55 +252,112 @@ class KWControlCard extends HTMLElement {
     }, { passive: true });
   }
 
-  // ═══ FAN — compact with speed row ═══════════════════════════════════════════
+  // ═══ FAN — pill speed slider with fan icon thumb ═════════════════════════════
   _renderFan() {
-    const attrs = this._entity.attributes, isOn = this._isOn;
+    const attrs   = this._entity.attributes;
+    const isOn    = this._isOn;
     const unavail = this._entity.state === 'unavailable';
-    const pct = attrs.percentage || 0, direction = attrs.direction || 'forward';
-    const hasDir = this._config.show_direction && (attrs.supported_features & 4);
-    const presets = attrs.preset_modes || [], curPreset = attrs.preset_mode;
-    const sz = this._sz, speeds = this._config.fan_speeds;
-    const activeSpd = isOn && !curPreset ? speeds.reduce((b,s) => Math.abs(s.pct-pct) < Math.abs(b.pct-pct) ? s : b, speeds[0]) : null;
-    const subText = unavail ? 'Unavailable' : !isOn ? 'Off' : curPreset ? curPreset.charAt(0).toUpperCase()+curPreset.slice(1) : activeSpd ? activeSpd.label : `${pct}%`;
+    const val     = isOn ? (attrs.percentage || 0) : 0;
+    const sz      = this._sz;
 
     this.shadowRoot.innerHTML = `
       <style>
         ${shellStyles(sz)}
-        .card { padding: ${sz.pad}; }
-        .header { display: flex; align-items: center; gap: 8px; }
-        .info { flex: 1; min-width: 0; }
-        .name { font-size: ${sz.name}px; font-weight: 600; color: var(--primary-text-color,#e8e8e8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .sub { font-size: ${sz.sub}px; color: var(--secondary-text-color,#9e9e9e); margin-top: 1px; }
-        .speed-row { display: flex; gap: 5px; }
-        .spd-btn { flex: 1; padding: 4px 0; border-radius: 7px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: var(--secondary-text-color,#9e9e9e); font-size: ${sz.spd}px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
-        .spd-btn:hover { background: rgba(255,255,255,0.09); }
-        .spd-btn.active { background: rgba(var(--rgb-accent-color,255,200,70),0.15); border-color: var(--accent-color,#ffcc46); color: var(--accent-color,#ffcc46); }
-        .dir-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
-        .dir-label { font-size: 9px; color: var(--secondary-text-color,#9e9e9e); text-transform: uppercase; letter-spacing: 0.5px; flex: 1; }
-        .dir-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: var(--secondary-text-color,#9e9e9e); font-size: 9px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; cursor: pointer; transition: background 0.12s; }
-        .dir-btn:hover { background: rgba(255,255,255,0.09); }
-        .dir-btn ha-icon { --mdc-icon-size: 12px; pointer-events: none; }
+        .card { padding: ${sz.pad}; cursor: default; }
+        .track {
+          position: relative; height: 18px; border-radius: 9px;
+          background: rgba(255,255,255,0.07);
+          cursor: ew-resize; user-select: none;
+        }
+        .fill {
+          position: absolute; left: 0; top: 0; bottom: 0;
+          width: ${val}%; border-radius: 9px;
+          background: var(--accent-color, #ffcc46);
+          opacity: ${isOn ? 0.5 : 0};
+          pointer-events: none;
+        }
+        .lbl {
+          position: absolute; inset: 0;
+          display: flex; align-items: center;
+          padding: 0 22px; justify-content: center;
+          font-size: ${sz.sub}px; font-weight: 600;
+          color: var(--primary-text-color, #e8e8e8);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          pointer-events: none; z-index: 2;
+        }
+        .thumb {
+          position: absolute; top: 50%;
+          left: clamp(1px, calc(${val}% - 9px), calc(100% - 18px));
+          transform: translateY(-50%);
+          width: 16px; height: 16px; border-radius: 50%;
+          background: rgba(15,17,28,0.85);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 3; pointer-events: none;
+          box-shadow: ${isOn
+            ? '0 0 6px rgba(var(--rgb-accent-color,255,200,70),0.9), 0 0 12px rgba(var(--rgb-accent-color,255,200,70),0.4)'
+            : '0 1px 3px rgba(0,0,0,0.5)'};
+        }
+        .thumb ha-icon {
+          --mdc-icon-size: 11px;
+          color: ${isOn ? 'var(--accent-color,#ffcc46)' : 'rgba(255,255,255,0.25)'};
+        }
       </style>
       <div class="card${unavail ? ' unavailable' : ''}">
-        <div class="header">
-          <div class="icon-wrap${isOn ? ' on' : ''}" id="icon-btn"><ha-icon icon="${isOn ? 'mdi:fan' : 'mdi:fan-off'}"></ha-icon></div>
-          <div class="info"><div class="name">${this._name}</div><div class="sub">${subText}</div></div>
-          <button class="toggle${isOn ? ' on' : ''}" id="toggle" aria-label="Toggle ${this._name}"></button>
+        <div class="track" id="track">
+          <div class="fill" id="fill"></div>
+          <div class="lbl">${this._name}</div>
+          <div class="thumb" id="thumb">
+            <ha-icon icon="mdi:fan"></ha-icon>
+          </div>
         </div>
-        <div class="divider"></div>
-        <div class="speed-row">
-          ${speeds.map(s => `<button class="spd-btn${activeSpd?.pct===s.pct?' active':''}" data-pct="${s.pct}">${s.label}</button>`).join('')}
-          ${presets.map(p => `<button class="spd-btn${curPreset===p?' active':''}" data-preset="${p}">${p.charAt(0).toUpperCase()+p.slice(1)}</button>`).join('')}
-        </div>
-        ${hasDir ? `<div class="dir-row"><span class="dir-label">Direction</span><button class="dir-btn" id="dir-btn"><ha-icon icon="${direction==='forward'?'mdi:rotate-right':'mdi:rotate-left'}"></ha-icon>${direction.charAt(0).toUpperCase()+direction.slice(1)}</button></div>` : ''}
       </div>`;
 
-    this.shadowRoot.getElementById('toggle').onclick = (e) => { e.stopPropagation(); this._svc('fan','toggle'); };
-    this.shadowRoot.getElementById('icon-btn').onclick = (e) => { e.stopPropagation(); this._moreInfo(); };
-    this.shadowRoot.querySelectorAll('.spd-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => { e.stopPropagation(); btn.dataset.preset ? this._svc('fan','set_preset_mode',{preset_mode:btn.dataset.preset}) : this._svc('fan','turn_on',{percentage:parseInt(btn.dataset.pct)}); });
+    const track = this.shadowRoot.getElementById('track');
+    const fill  = this.shadowRoot.getElementById('fill');
+    const thumb = this.shadowRoot.getElementById('thumb');
+
+    const getPercent = (clientX) => {
+      const rect = track.getBoundingClientRect();
+      return Math.max(0, Math.min(100, Math.round((clientX - rect.left) / rect.width * 100)));
+    };
+    const updateUI = (pct) => {
+      fill.style.width   = pct + '%';
+      fill.style.opacity = pct > 0 ? '0.5' : '0';
+      thumb.style.left   = `clamp(1px, calc(${pct}% - 9px), calc(100% - 18px))`;
+    };
+    let startX = 0, moved = false;
+    const onMove = (clientX) => {
+      if (Math.abs(clientX - startX) > 3) moved = true;
+      if (!moved) return;
+      this._dragging = true; updateUI(getPercent(clientX));
+    };
+    const onUp = (clientX) => {
+      const pct = getPercent(clientX);
+      if (pct === 0) this._svc('fan', 'turn_off');
+      else           this._svc('fan', 'turn_on', { percentage: pct });
+      this._dragging = false; moved = false; cleanup();
+    };
+    const mmove = (e) => onMove(e.clientX);
+    const mup   = (e) => onUp(e.clientX);
+    const tmove = (e) => { e.preventDefault(); onMove(e.touches[0].clientX); };
+    const tup   = (e) => onUp(e.changedTouches[0].clientX);
+    const cleanup = () => {
+      document.removeEventListener('mousemove', mmove);
+      document.removeEventListener('mouseup',   mup);
+      document.removeEventListener('touchmove', tmove);
+      document.removeEventListener('touchend',  tup);
+    };
+    this._cleanupDrag = cleanup;
+    track.addEventListener('mousedown', (e) => {
+      startX = e.clientX; moved = false;
+      document.addEventListener('mousemove', mmove);
+      document.addEventListener('mouseup',   mup);
     });
-    this.shadowRoot.getElementById('dir-btn')?.addEventListener('click', (e) => { e.stopPropagation(); this._svc('fan','set_direction',{direction:direction==='forward'?'reverse':'forward'}); });
+    track.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX; moved = false;
+      document.addEventListener('touchmove', tmove, { passive: false });
+      document.addEventListener('touchend',  tup);
+    }, { passive: true });
   }
 
   // ═══ MEDIA PLAYER ════════════════════════════════════════════════════════════
