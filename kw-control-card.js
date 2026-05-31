@@ -1,4 +1,4 @@
-// kw-control-card.js — v1.1.2
+// kw-control-card.js — v1.1.3
 // Uniform control card for lights, fans, media players, and cameras.
 // Designed to inherit Frosted Glass Dark theme CSS variables automatically.
 //
@@ -18,7 +18,7 @@
 //     - label: High
 //       pct: 100
 
-const KW_CARD_VERSION = '1.1.2';
+const KW_CARD_VERSION = '1.1.3';
 
 // ─── Size presets (tightened for v1.1) ───────────────────────────────────────
 const SIZES = {
@@ -201,7 +201,7 @@ class KWControlCard extends HTMLElement {
     else                                                  this._renderGeneric();
   }
 
-  // ═══ LIGHT — compact with drag-to-dim ═══════════════════════════════════════
+  // ═══ LIGHT — compact, drag-to-dim, no toggle or sub-text ════════════════════
   _renderLight() {
     const attrs   = this._entity.attributes;
     const isOn    = this._isOn;
@@ -209,8 +209,6 @@ class KWControlCard extends HTMLElement {
     const bright  = attrs.brightness ? Math.round(attrs.brightness / 255 * 100) : 0;
     const sz      = this._sz;
     const colorTemp = attrs.color_temp_kelvin ? ` · ${attrs.color_temp_kelvin}K` : '';
-    const subText = unavail ? 'Unavailable' : isOn ? `${bright}%${colorTemp}` : 'Off';
-
     this.shadowRoot.innerHTML = `
       <style>
         ${shellStyles(sz)}
@@ -236,16 +234,11 @@ class KWControlCard extends HTMLElement {
           display: flex; align-items: center; gap: 8px;
           z-index: 1;
         }
-        .info { flex: 1; min-width: 0; }
         .name {
+          flex: 1; min-width: 0;
           font-size: ${sz.name}px; font-weight: 600;
           color: var(--primary-text-color, #e8e8e8);
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .sub {
-          font-size: ${sz.sub}px;
-          color: var(--secondary-text-color, #9e9e9e);
-          margin-top: 1px;
         }
       </style>
       <div class="card${unavail ? ' unavailable' : ''}" id="card">
@@ -254,21 +247,12 @@ class KWControlCard extends HTMLElement {
           <div class="icon-wrap${isOn ? ' on' : ''}" id="icon-btn">
             <ha-icon icon="${this._icon}"></ha-icon>
           </div>
-          <div class="info">
-            <div class="name">${this._name}</div>
-            <div class="sub" id="sub">${subText}</div>
-          </div>
-          <button class="toggle${isOn ? ' on' : ''}" id="toggle"
-            aria-label="Toggle ${this._name}"></button>
+          <div class="name">${this._name}</div>
         </div>
       </div>`;
 
-    const card   = this.shadowRoot.getElementById('card');
-    const fill   = this.shadowRoot.getElementById('fill');
-    const subEl  = this.shadowRoot.getElementById('sub');
-    const toggle = this.shadowRoot.getElementById('toggle');
-
-    toggle.onclick = (e) => { e.stopPropagation(); this._svc('light', 'toggle'); };
+    const card = this.shadowRoot.getElementById('card');
+    const fill = this.shadowRoot.getElementById('fill');
     this.shadowRoot.getElementById('icon-btn').onclick = (e) => { e.stopPropagation(); this._moreInfo(); };
 
     let startX = 0, moved = false;
@@ -279,13 +263,11 @@ class KWControlCard extends HTMLElement {
     const onMove = (clientX) => {
       if (Math.abs(clientX - startX) > 4) moved = true;
       if (!moved) return;
-      const pct = getPercent(clientX);
-      fill.style.setProperty('--bp', pct + '%');
-      subEl.textContent = pct + '%';
+      fill.style.setProperty('--bp', getPercent(clientX) + '%');
       this._dragging = true;
     };
     const onUp = (clientX) => {
-      if (moved) { const pct = getPercent(clientX); this._svc('light', 'turn_on', { brightness_pct: pct }); }
+      if (moved) this._svc('light', 'turn_on', { brightness_pct: getPercent(clientX) });
       this._dragging = false; moved = false; cleanup();
     };
     const mmove = (e) => onMove(e.clientX);
@@ -300,13 +282,13 @@ class KWControlCard extends HTMLElement {
     };
     this._cleanupDrag = cleanup;
     card.addEventListener('mousedown', (e) => {
-      if (e.target.closest('#toggle, #icon-btn')) return;
+      if (e.target.closest('#icon-btn')) return;
       startX = e.clientX; moved = false;
       document.addEventListener('mousemove', mmove);
       document.addEventListener('mouseup',   mup);
     });
     card.addEventListener('touchstart', (e) => {
-      if (e.target.closest('#toggle, #icon-btn')) return;
+      if (e.target.closest('#icon-btn')) return;
       startX = e.touches[0].clientX; moved = false;
       document.addEventListener('touchmove', tmove, { passive: false });
       document.addEventListener('touchend',  tup);
@@ -328,11 +310,7 @@ class KWControlCard extends HTMLElement {
     const activeSpd = isOn && !curPreset
       ? speeds.reduce((b, s) => Math.abs(s.pct - pct) < Math.abs(b.pct - pct) ? s : b, speeds[0])
       : null;
-    const subText = unavail ? 'Unavailable'
-      : !isOn ? 'Off'
-      : curPreset ? curPreset.charAt(0).toUpperCase() + curPreset.slice(1)
-      : activeSpd ? activeSpd.label
-      : `${pct}%`;
+    const subText = unavail ? 'Unavailable' : !isOn ? 'Off' : curPreset ? curPreset.charAt(0).toUpperCase() + curPreset.slice(1) : activeSpd ? activeSpd.label : `${pct}%`;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -354,13 +332,8 @@ class KWControlCard extends HTMLElement {
       </style>
       <div class="card${unavail ? ' unavailable' : ''}">
         <div class="header">
-          <div class="icon-wrap${isOn ? ' on' : ''}" id="icon-btn">
-            <ha-icon icon="${isOn ? 'mdi:fan' : 'mdi:fan-off'}"></ha-icon>
-          </div>
-          <div class="info">
-            <div class="name">${this._name}</div>
-            <div class="sub">${subText}</div>
-          </div>
+          <div class="icon-wrap${isOn ? ' on' : ''}" id="icon-btn"><ha-icon icon="${isOn ? 'mdi:fan' : 'mdi:fan-off'}"></ha-icon></div>
+          <div class="info"><div class="name">${this._name}</div><div class="sub">${subText}</div></div>
           <button class="toggle${isOn ? ' on' : ''}" id="toggle" aria-label="Toggle ${this._name}"></button>
         </div>
         <div class="divider"></div>
@@ -374,31 +347,18 @@ class KWControlCard extends HTMLElement {
     this.shadowRoot.getElementById('toggle').onclick = (e) => { e.stopPropagation(); this._svc('fan', 'toggle'); };
     this.shadowRoot.getElementById('icon-btn').onclick = (e) => { e.stopPropagation(); this._moreInfo(); };
     this.shadowRoot.querySelectorAll('.spd-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        btn.dataset.preset
-          ? this._svc('fan', 'set_preset_mode', { preset_mode: btn.dataset.preset })
-          : this._svc('fan', 'turn_on', { percentage: parseInt(btn.dataset.pct) });
-      });
+      btn.addEventListener('click', (e) => { e.stopPropagation(); btn.dataset.preset ? this._svc('fan', 'set_preset_mode', { preset_mode: btn.dataset.preset }) : this._svc('fan', 'turn_on', { percentage: parseInt(btn.dataset.pct) }); });
     });
-    this.shadowRoot.getElementById('dir-btn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this._svc('fan', 'set_direction', { direction: direction === 'forward' ? 'reverse' : 'forward' });
-    });
+    this.shadowRoot.getElementById('dir-btn')?.addEventListener('click', (e) => { e.stopPropagation(); this._svc('fan', 'set_direction', { direction: direction === 'forward' ? 'reverse' : 'forward' }); });
   }
 
   // ═══ MEDIA PLAYER — standard with controls ════════════════════════════════
   _renderMedia() {
-    const attrs     = this._entity.attributes;
-    const state     = this._entity.state;
-    const isOn      = this._isOn;
-    const isPlaying = state === 'playing';
-    const unavail   = state === 'unavailable';
-    const vol       = attrs.volume_level != null ? Math.round(attrs.volume_level * 100) : 50;
-    const muted     = attrs.is_volume_muted || false;
-    const sz        = this._sz;
-    const mediaTitle  = attrs.media_title  || '';
-    const mediaArtist = attrs.media_artist || '';
+    const attrs = this._entity.attributes, state = this._entity.state;
+    const isOn = this._isOn, isPlaying = state === 'playing', unavail = state === 'unavailable';
+    const vol = attrs.volume_level != null ? Math.round(attrs.volume_level * 100) : 50;
+    const muted = attrs.is_volume_muted || false, sz = this._sz;
+    const mediaTitle = attrs.media_title || '', mediaArtist = attrs.media_artist || '';
     const subText = unavail ? 'Unavailable' : !isOn ? 'Off' : mediaArtist && mediaTitle ? `${mediaArtist} — ${mediaTitle}` : mediaTitle || state;
     const sf = attrs.supported_features || 0;
     const hasPrev = !!(sf & 16), hasNext = !!(sf & 32), hasVol = !!(sf & 4);
@@ -446,7 +406,7 @@ class KWControlCard extends HTMLElement {
     this.shadowRoot.getElementById('mute-btn')?.addEventListener('click', (e) => { e.stopPropagation(); this._svc('media_player', 'volume_mute', { is_volume_muted: !muted }); });
     const vsl = this.shadowRoot.getElementById('volume');
     if (vsl) {
-      vsl.addEventListener('mousedown',  () => this._dragging = true);
+      vsl.addEventListener('mousedown', () => this._dragging = true);
       vsl.addEventListener('touchstart', () => this._dragging = true);
       vsl.addEventListener('input', (e) => { this.shadowRoot.getElementById('vval').textContent = `${e.target.value}%`; vsl.style.background = sliderGrad(e.target.value); });
       vsl.addEventListener('change', (e) => { this._dragging = false; this._svc('media_player', 'volume_set', { volume_level: parseInt(e.target.value) / 100 }); });
@@ -455,96 +415,47 @@ class KWControlCard extends HTMLElement {
 
   // ═══ TV SQUARE — responsive square tile, tap to toggle ══════════════════════
   _renderTVSquare() {
-    const isOn    = this._isOn;
-    const unavail = this._entity.state === 'unavailable';
-    const sz      = this._sz;
+    const isOn = this._isOn, unavail = this._entity.state === 'unavailable', sz = this._sz;
     const iconSize = this._config.size === 'small' ? 22 : this._config.size === 'large' ? 32 : 26;
-
     this.shadowRoot.innerHTML = `
       <style>
         ${shellStyles(sz)}
         :host { display: block; }
-        .card {
-          width: 100%;
-          aspect-ratio: 1 / 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 5px;
-          padding: 8px;
-          cursor: pointer;
-        }
-        .sq-icon {
-          width: ${iconSize + 10}px; height: ${iconSize + 10}px;
-          border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          background: rgba(255,255,255,0.06);
-          transition: background 0.25s, box-shadow 0.25s;
-          flex-shrink: 0;
-        }
-        .sq-icon.on {
-          background: rgba(var(--rgb-accent-color,255,200,70), 0.2);
-          box-shadow: 0 0 12px rgba(var(--rgb-accent-color,255,200,70), 0.3);
-        }
-        .sq-icon ha-icon {
-          --mdc-icon-size: ${iconSize}px;
-          color: var(--secondary-text-color, #9e9e9e);
-          transition: color 0.25s;
-          pointer-events: none;
-        }
-        .sq-icon.on ha-icon { color: var(--accent-color, #ffcc46); }
-        .sq-name {
-          font-size: 9px; font-weight: 600;
-          color: var(--primary-text-color, #e8e8e8);
-          text-align: center; line-height: 1.2;
-          overflow: hidden;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          width: 100%;
-        }
+        .card { width: 100%; aspect-ratio: 1/1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 8px; cursor: pointer; }
+        .sq-icon { width: ${iconSize+10}px; height: ${iconSize+10}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); transition: background 0.25s, box-shadow 0.25s; flex-shrink: 0; }
+        .sq-icon.on { background: rgba(var(--rgb-accent-color,255,200,70),0.2); box-shadow: 0 0 12px rgba(var(--rgb-accent-color,255,200,70),0.3); }
+        .sq-icon ha-icon { --mdc-icon-size: ${iconSize}px; color: var(--secondary-text-color,#9e9e9e); transition: color 0.25s; pointer-events: none; }
+        .sq-icon.on ha-icon { color: var(--accent-color,#ffcc46); }
+        .sq-name { font-size: 9px; font-weight: 600; color: var(--primary-text-color,#e8e8e8); text-align: center; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; width: 100%; }
       </style>
       <div class="card${unavail ? ' unavailable' : ''}" id="card">
-        <div class="sq-icon${isOn ? ' on' : ''}">
-          <ha-icon icon="${this._icon}"></ha-icon>
-        </div>
+        <div class="sq-icon${isOn ? ' on' : ''}"><ha-icon icon="${this._icon}"></ha-icon></div>
         <div class="sq-name">${this._name}</div>
       </div>`;
-
-    this.shadowRoot.getElementById('card').addEventListener('click', () => {
-      this._svc('media_player', 'toggle');
-    });
+    this.shadowRoot.getElementById('card').addEventListener('click', () => this._svc('media_player', 'toggle'));
   }
 
   // ═══ CAMERA ══════════════════════════════════════════════════════════════
   _renderCamera() {
-    const pic    = this._entity.attributes?.entity_picture;
+    const pic = this._entity.attributes?.entity_picture;
     const imgSrc = pic ? (this._hass.hassUrl ? this._hass.hassUrl(pic) : pic) + `&t=${Date.now()}` : null;
     this.shadowRoot.innerHTML = `
       <style>
         ${shellStyles(this._sz)}
         .card { padding: 0; cursor: pointer; }
-        .cam-wrap { position: relative; overflow: hidden; border-radius: var(--ha-card-border-radius, 14px); aspect-ratio: 16 / 9; background: rgba(0,0,0,0.3); }
+        .cam-wrap { position: relative; overflow: hidden; border-radius: var(--ha-card-border-radius,14px); aspect-ratio: 16/9; background: rgba(0,0,0,0.3); }
         .cam-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .cam-label { position: absolute; bottom: 0; left: 0; right: 0; padding: 5px 9px; background: linear-gradient(transparent, rgba(0,0,0,0.65)); font-size: 11px; font-weight: 600; color: #fff; }
+        .cam-label { position: absolute; bottom: 0; left: 0; right: 0; padding: 5px 9px; background: linear-gradient(transparent,rgba(0,0,0,0.65)); font-size: 11px; font-weight: 600; color: #fff; }
         .cam-none { display: flex; align-items: center; justify-content: center; padding: 28px 0; }
         .cam-none ha-icon { --mdc-icon-size: 36px; color: rgba(255,255,255,0.2); }
       </style>
-      <div class="card" id="cam">
-        <div class="cam-wrap">
-          ${imgSrc ? `<img class="cam-img" src="${imgSrc}" alt="${this._name}">` : `<div class="cam-none"><ha-icon icon="mdi:camera-off"></ha-icon></div>`}
-          <div class="cam-label">${this._name}</div>
-        </div>
-      </div>`;
+      <div class="card" id="cam"><div class="cam-wrap">${imgSrc ? `<img class="cam-img" src="${imgSrc}" alt="${this._name}">` : `<div class="cam-none"><ha-icon icon="mdi:camera-off"></ha-icon></div>`}<div class="cam-label">${this._name}</div></div></div>`;
     this.shadowRoot.getElementById('cam').onclick = () => this._moreInfo();
   }
 
   // ═══ GENERIC ═════════════════════════════════════════════════════════════
   _renderGeneric() {
-    const isOn    = this._isOn;
-    const unavail = this._entity.state === 'unavailable';
-    const sz      = this._sz;
+    const isOn = this._isOn, unavail = this._entity.state === 'unavailable', sz = this._sz;
     this.shadowRoot.innerHTML = `
       <style>
         ${shellStyles(sz)}
