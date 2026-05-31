@@ -1,4 +1,4 @@
-// kw-control-card.js — v1.1.0
+// kw-control-card.js — v1.1.1
 // Uniform control card for lights, fans, media players, and cameras.
 // Designed to inherit Frosted Glass Dark theme CSS variables automatically.
 //
@@ -18,7 +18,7 @@
 //     - label: High
 //       pct: 100
 
-const KW_CARD_VERSION = '1.1.0';
+const KW_CARD_VERSION = '1.1.1';
 
 // ─── Size presets (tightened for v1.1) ───────────────────────────────────────
 const SIZES = {
@@ -562,36 +562,39 @@ class KWControlCard extends HTMLElement {
     }
   }
 
-  // ═══ TV SQUARE — icon tile, tap to toggle ════════════════════════════════
+  // ═══ TV SQUARE — fixed 84px tile, tap to toggle ═══════════════════════════
   _renderTVSquare() {
     const isOn    = this._isOn;
     const unavail = this._entity.state === 'unavailable';
     const sz      = this._sz;
-    const iconSize = this._config.size === 'small' ? 28 : this._config.size === 'large' ? 40 : 34;
+    const iconSize = this._config.size === 'small' ? 22 : this._config.size === 'large' ? 32 : 26;
 
     this.shadowRoot.innerHTML = `
       <style>
         ${shellStyles(sz)}
+        :host { display: flex; justify-content: center; }
         .card {
-          aspect-ratio: 1 / 1;
+          width: 84px;
+          height: 84px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 7px;
-          padding: 10px;
+          gap: 5px;
+          padding: 8px;
           cursor: pointer;
         }
         .sq-icon {
-          width: ${iconSize + 16}px; height: ${iconSize + 16}px;
+          width: ${iconSize + 10}px; height: ${iconSize + 10}px;
           border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
           background: rgba(255,255,255,0.06);
           transition: background 0.25s, box-shadow 0.25s;
+          flex-shrink: 0;
         }
         .sq-icon.on {
           background: rgba(var(--rgb-accent-color,255,200,70), 0.2);
-          box-shadow: 0 0 16px rgba(var(--rgb-accent-color,255,200,70), 0.3);
+          box-shadow: 0 0 12px rgba(var(--rgb-accent-color,255,200,70), 0.3);
         }
         .sq-icon ha-icon {
           --mdc-icon-size: ${iconSize}px;
@@ -601,9 +604,9 @@ class KWControlCard extends HTMLElement {
         }
         .sq-icon.on ha-icon { color: var(--accent-color, #ffcc46); }
         .sq-name {
-          font-size: ${sz.sub}px; font-weight: 600;
+          font-size: 9px; font-weight: 600;
           color: var(--primary-text-color, #e8e8e8);
-          text-align: center; line-height: 1.3;
+          text-align: center; line-height: 1.2;
           overflow: hidden;
           display: -webkit-box;
           -webkit-line-clamp: 2;
