@@ -1,4 +1,4 @@
-// kw-control-card.js — v1.2.0
+// kw-control-card.js — v1.2.1
 // Uniform control card for lights, fans, media players, and cameras.
 // Designed to inherit Frosted Glass Dark theme CSS variables automatically.
 //
@@ -18,7 +18,7 @@
 //     - label: High
 //       pct: 100
 
-const KW_CARD_VERSION = '1.2.0';
+const KW_CARD_VERSION = '1.2.1';
 
 // ─── Size presets ───────────────────────────────────────────────────────────────────
 const SIZES = {
@@ -216,42 +216,50 @@ class KWControlCard extends HTMLElement {
       thumb.style.left = `clamp(1px, calc(${pct}% - 9px), calc(100% - 18px))`;
     };
 
-    let startX = 0, moved = false;
-    const onMove = (clientX) => {
-      if (Math.abs(clientX - startX) > 3) moved = true;
-      if (!moved) return;
-      this._dragging = true;
-      const pct = getPercent(clientX);
-      updateUI(canDim ? pct : (pct > 0 ? 100 : 0));
-    };
-    const onUp = (clientX) => {
-      const pct = getPercent(clientX);
-      if (pct === 0)     this._svc('light', 'turn_off');
-      else if (canDim)   this._svc('light', 'turn_on', { brightness_pct: pct });
-      else               this._svc('light', 'turn_on');
-      this._dragging = false; moved = false; cleanup();
-    };
-    const mmove = (e) => onMove(e.clientX);
-    const mup   = (e) => onUp(e.clientX);
-    const tmove = (e) => { e.preventDefault(); onMove(e.touches[0].clientX); };
-    const tup   = (e) => onUp(e.changedTouches[0].clientX);
-    const cleanup = () => {
-      document.removeEventListener('mousemove', mmove);
-      document.removeEventListener('mouseup',   mup);
-      document.removeEventListener('touchmove', tmove);
-      document.removeEventListener('touchend',  tup);
-    };
-    this._cleanupDrag = cleanup;
-    track.addEventListener('mousedown', (e) => {
-      startX = e.clientX; moved = false;
-      document.addEventListener('mousemove', mmove);
-      document.addEventListener('mouseup',   mup);
-    });
-    track.addEventListener('touchstart', (e) => {
-      startX = e.touches[0].clientX; moved = false;
-      document.addEventListener('touchmove', tmove, { passive: false });
-      document.addEventListener('touchend',  tup);
-    }, { passive: true });
+    if (canDim) {
+      // ── Dimmable: drag to set brightness ──────────────────────────────────
+      let startX = 0, moved = false;
+      const onMove = (clientX) => {
+        if (Math.abs(clientX - startX) > 3) moved = true;
+        if (!moved) return;
+        this._dragging = true;
+        updateUI(getPercent(clientX));
+      };
+      const onUp = (clientX) => {
+        const pct = getPercent(clientX);
+        if (pct === 0) this._svc('light', 'turn_off');
+        else           this._svc('light', 'turn_on', { brightness_pct: pct });
+        this._dragging = false; moved = false; cleanup();
+      };
+      const mmove = (e) => onMove(e.clientX);
+      const mup   = (e) => onUp(e.clientX);
+      const tmove = (e) => { e.preventDefault(); onMove(e.touches[0].clientX); };
+      const tup   = (e) => onUp(e.changedTouches[0].clientX);
+      const cleanup = () => {
+        document.removeEventListener('mousemove', mmove);
+        document.removeEventListener('mouseup',   mup);
+        document.removeEventListener('touchmove', tmove);
+        document.removeEventListener('touchend',  tup);
+      };
+      this._cleanupDrag = cleanup;
+      track.addEventListener('mousedown', (e) => {
+        startX = e.clientX; moved = false;
+        document.addEventListener('mousemove', mmove);
+        document.addEventListener('mouseup',   mup);
+      });
+      track.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX; moved = false;
+        document.addEventListener('touchmove', tmove, { passive: false });
+        document.addEventListener('touchend',  tup);
+      }, { passive: true });
+    } else {
+      // ── Non-dimmable: tap to toggle, thumb snaps right(on)/left(off) ──────
+      track.style.cursor = 'pointer';
+      track.addEventListener('click', () => {
+        if (isOn) this._svc('light', 'turn_off');
+        else      this._svc('light', 'turn_on');
+      });
+    }
   }
 
   // ═══ FAN — pill speed slider with fan icon thumb ═════════════════════════════
