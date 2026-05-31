@@ -1,4 +1,4 @@
-// kw-control-card.js — v1.1.7
+// kw-control-card.js — v1.1.8
 // Uniform control card for lights, fans, media players, and cameras.
 // Designed to inherit Frosted Glass Dark theme CSS variables automatically.
 //
@@ -18,7 +18,7 @@
 //     - label: High
 //       pct: 100
 
-const KW_CARD_VERSION = '1.1.7';
+const KW_CARD_VERSION = '1.1.8';
 
 // ─── Size presets ───────────────────────────────────────────────────────────────────
 const SIZES = {
@@ -225,8 +225,9 @@ class KWControlCard extends HTMLElement {
     };
     const onUp = (clientX) => {
       const pct = getPercent(clientX);
-      if (pct === 0) this._svc('light', 'turn_off');
-      else           this._svc('light', 'turn_on', { brightness_pct: pct });
+      if (pct === 0)     this._svc('light', 'turn_off');
+      else if (canDim)   this._svc('light', 'turn_on', { brightness_pct: pct });
+      else               this._svc('light', 'turn_on');
       this._dragging = false; moved = false; cleanup();
     };
     const mmove = (e) => onMove(e.clientX);
