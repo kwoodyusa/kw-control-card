@@ -1,4 +1,4 @@
-// kw-control-card.js — v1.1.4
+// kw-control-card.js — v1.1.5
 // Uniform control card for lights, fans, media players, and cameras.
 // Designed to inherit Frosted Glass Dark theme CSS variables automatically.
 //
@@ -18,9 +18,9 @@
 //     - label: High
 //       pct: 100
 
-const KW_CARD_VERSION = '1.1.4';
+const KW_CARD_VERSION = '1.1.5';
 
-// ─── Size presets ─────────────────────────────────────────────────────────────
+// ─── Size presets ───────────────────────────────────────────────────────────────────
 const SIZES = {
   small:  { iconWrap: 28, icon: 16, name: 11, sub: 10, pad: '8px 10px',  controlGap: 6,  spd: 9  },
   medium: { iconWrap: 34, icon: 19, name: 13, sub: 11, pad: '10px 14px', controlGap: 7,  spd: 10 },
@@ -133,53 +133,122 @@ class KWControlCard extends HTMLElement {
     else                                                  this._renderGeneric();
   }
 
-  // ═══ LIGHT — icon + name + pill brightness slider ════════════════════════════
+  // ═══ LIGHT — pill track with name inside + glowing bulb thumb ════════════════
   _renderLight() {
     const attrs = this._entity.attributes;
     const isOn = this._isOn, unavail = this._entity.state === 'unavailable';
     const bright = attrs.brightness ? Math.round(attrs.brightness / 255 * 100) : 0;
     const val = isOn ? bright : 0, sz = this._sz;
 
+    // Color: use light's rgb, or cool blue for white/tunable lights
+    let lightColor;
+    if (isOn && attrs.rgb_color) {
+      const [r, g, b] = attrs.rgb_color;
+      lightColor = `rgb(${r},${g},${b})`;
+    } else {
+      lightColor = '#6eb6ff';
+    }
+
     this.shadowRoot.innerHTML = `
       <style>
         ${shellStyles(sz)}
-        .card { padding: ${sz.pad}; }
-        .header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        .name { flex: 1; min-width: 0; font-size: ${sz.name}px; font-weight: 600; color: var(--primary-text-color,#e8e8e8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        input[type=range] {
-          -webkit-appearance: none; appearance: none;
-          width: 100%; height: 28px; border-radius: 14px;
-          background: ${sliderGrad(val)};
-          cursor: pointer; outline: none; border: none; display: block;
+        .card { padding: ${sz.pad}; cursor: default; }
+        .track {
+          position: relative; height: 36px; border-radius: 18px;
+          background: rgba(255,255,255,0.07);
+          cursor: ew-resize; user-select: none;
         }
-        input[type=range]::-webkit-slider-thumb {
-          -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
-          background: rgba(0,0,0,0.5); cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,0.5);
+        .fill {
+          position: absolute; left: 0; top: 0; bottom: 0;
+          width: ${val}%; border-radius: 18px;
+          background: ${lightColor};
+          opacity: ${isOn ? 0.5 : 0};
+          pointer-events: none;
         }
-        input[type=range]::-moz-range-thumb {
-          width: 22px; height: 22px; border-radius: 50%;
-          background: rgba(0,0,0,0.5); border: none; cursor: pointer;
+        .lbl {
+          position: absolute; inset: 0;
+          display: flex; align-items: center;
+          padding: 0 44px 0 14px;
+          font-size: ${sz.name}px; font-weight: 600;
+          color: var(--primary-text-color, #e8e8e8);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          pointer-events: none; z-index: 2;
+        }
+        .thumb {
+          position: absolute; top: 50%;
+          left: clamp(2px, calc(${val}% - 18px), calc(100% - 36px));
+          transform: translateY(-50%);
+          width: 32px; height: 32px; border-radius: 50%;
+          background: rgba(15,17,28,0.85);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 3; pointer-events: none;
+          box-shadow: ${isOn
+            ? `0 0 8px ${lightColor}, 0 0 18px ${lightColor}55`
+            : '0 1px 4px rgba(0,0,0,0.5)'};
+        }
+        .thumb ha-icon {
+          --mdc-icon-size: 18px;
+          color: ${isOn ? lightColor : 'rgba(255,255,255,0.25)'};
         }
       </style>
       <div class="card${unavail ? ' unavailable' : ''}">
-        <div class="header">
-          <div class="icon-wrap${isOn ? ' on' : ''}" id="icon-btn"><ha-icon icon="${this._icon}"></ha-icon></div>
-          <div class="name">${this._name}</div>
+        <div class="track" id="track">
+          <div class="fill" id="fill"></div>
+          <div class="lbl">${this._name}</div>
+          <div class="thumb" id="thumb">
+            <ha-icon icon="mdi:lightbulb"></ha-icon>
+          </div>
         </div>
-        <input type="range" id="brightness" min="0" max="100" value="${val}">
       </div>`;
 
-    this.shadowRoot.getElementById('icon-btn').onclick = (e) => { e.stopPropagation(); this._moreInfo(); };
-    const slider = this.shadowRoot.getElementById('brightness');
-    slider.addEventListener('mousedown',  () => this._dragging = true);
-    slider.addEventListener('touchstart', () => this._dragging = true, { passive: true });
-    slider.addEventListener('input', (e) => { slider.style.background = sliderGrad(e.target.value); });
-    slider.addEventListener('change', (e) => {
-      this._dragging = false;
-      const pct = parseInt(e.target.value);
+    const track = this.shadowRoot.getElementById('track');
+    const fill  = this.shadowRoot.getElementById('fill');
+    const thumb = this.shadowRoot.getElementById('thumb');
+
+    const getPercent = (clientX) => {
+      const rect = track.getBoundingClientRect();
+      return Math.max(0, Math.min(100, Math.round((clientX - rect.left) / rect.width * 100)));
+    };
+    const updateUI = (pct) => {
+      fill.style.width = pct + '%';
+      fill.style.opacity = pct > 0 ? '0.5' : '0';
+      thumb.style.left = `clamp(2px, calc(${pct}% - 18px), calc(100% - 36px))`;
+    };
+
+    let startX = 0, moved = false;
+    const onMove = (clientX) => {
+      if (Math.abs(clientX - startX) > 3) moved = true;
+      if (!moved) return;
+      this._dragging = true;
+      updateUI(getPercent(clientX));
+    };
+    const onUp = (clientX) => {
+      const pct = getPercent(clientX);
       if (pct === 0) this._svc('light', 'turn_off');
       else           this._svc('light', 'turn_on', { brightness_pct: pct });
+      this._dragging = false; moved = false; cleanup();
+    };
+    const mmove = (e) => onMove(e.clientX);
+    const mup   = (e) => onUp(e.clientX);
+    const tmove = (e) => { e.preventDefault(); onMove(e.touches[0].clientX); };
+    const tup   = (e) => onUp(e.changedTouches[0].clientX);
+    const cleanup = () => {
+      document.removeEventListener('mousemove', mmove);
+      document.removeEventListener('mouseup',   mup);
+      document.removeEventListener('touchmove', tmove);
+      document.removeEventListener('touchend',  tup);
+    };
+    this._cleanupDrag = cleanup;
+    track.addEventListener('mousedown', (e) => {
+      startX = e.clientX; moved = false;
+      document.addEventListener('mousemove', mmove);
+      document.addEventListener('mouseup',   mup);
     });
+    track.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX; moved = false;
+      document.addEventListener('touchmove', tmove, { passive: false });
+      document.addEventListener('touchend',  tup);
+    }, { passive: true });
   }
 
   // ═══ FAN — compact with speed row ═══════════════════════════════════════════
@@ -286,14 +355,14 @@ class KWControlCard extends HTMLElement {
     this.shadowRoot.getElementById('mute-btn')?.addEventListener('click',(e)=>{ e.stopPropagation(); this._svc('media_player','volume_mute',{is_volume_muted:!muted}); });
     const vsl = this.shadowRoot.getElementById('volume');
     if (vsl) {
-      vsl.addEventListener('mousedown', ()=>this._dragging=true);
+      vsl.addEventListener('mousedown',()=>this._dragging=true);
       vsl.addEventListener('touchstart',()=>this._dragging=true);
       vsl.addEventListener('input',(e)=>{ this.shadowRoot.getElementById('vval').textContent=`${e.target.value}%`; vsl.style.background=sliderGrad(e.target.value); });
       vsl.addEventListener('change',(e)=>{ this._dragging=false; this._svc('media_player','volume_set',{volume_level:parseInt(e.target.value)/100}); });
     }
   }
 
-  // ═══ TV SQUARE ═══════════════════════════════════════════════════════════════
+  // ═══ TV SQUARE ══════════════════════════════════════════════════════════════
   _renderTVSquare() {
     const isOn = this._isOn, unavail = this._entity.state==='unavailable', sz = this._sz;
     const iconSize = this._config.size==='small'?22:this._config.size==='large'?32:26;
@@ -315,7 +384,7 @@ class KWControlCard extends HTMLElement {
     this.shadowRoot.getElementById('card').addEventListener('click',()=>this._svc('media_player','toggle'));
   }
 
-  // ═══ CAMERA ══════════════════════════════════════════════════════════════════
+  // ═══ CAMERA ══════════════════════════════════════════════════════════════
   _renderCamera() {
     const pic = this._entity.attributes?.entity_picture;
     const imgSrc = pic ? (this._hass.hassUrl?this._hass.hassUrl(pic):pic)+`&t=${Date.now()}` : null;
@@ -333,7 +402,7 @@ class KWControlCard extends HTMLElement {
     this.shadowRoot.getElementById('cam').onclick = ()=>this._moreInfo();
   }
 
-  // ═══ GENERIC ═════════════════════════════════════════════════════════════════
+  // ═══ GENERIC ═════════════════════════════════════════════════════════════
   _renderGeneric() {
     const isOn = this._isOn, unavail = this._entity.state==='unavailable', sz = this._sz;
     this.shadowRoot.innerHTML = `
@@ -368,5 +437,5 @@ if (!customElements.get('kw-control-card')) {
 }
 window.customCards = window.customCards || [];
 if (!window.customCards.find(c => c.type === 'kw-control-card')) {
-  window.customCards.push({ type: 'kw-control-card', name: 'KW Control Card', description: 'Compact control card for lights, fans, media players, and cameras. Frosted Glass Dark.', preview: false });
+  window.customCards.push({ type: 'kw-control-card', name: 'KW Control Card', description: 'Compact control card for lights, fans, media players, and cameras.', preview: false });
 }
