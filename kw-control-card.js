@@ -168,7 +168,8 @@ class KWControlCard extends HTMLElement {
         .lbl {
           position: absolute; inset: 0;
           display: flex; align-items: center;
-          padding: 0 44px 0 14px;
+          padding: 0 44px;
+          justify-content: center;
           font-size: ${sz.name}px; font-weight: 600;
           color: var(--primary-text-color, #e8e8e8);
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
