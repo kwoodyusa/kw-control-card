@@ -1,4 +1,4 @@
-// kw-control-card.js — v1.2.1
+—// kw-control-card.js — v1.2.1
 // Uniform control card for lights, fans, media players, and cameras.
 // Designed to inherit Frosted Glass Dark theme CSS variables automatically.
 //
@@ -12,7 +12,6 @@
 //   show_direction: true     # show fan direction toggle (default: true)
 //   fan_speeds:
 //     - label: Low
-//       pct: 14
 //     - label: Med
 //       pct: 57
 //     - label: High
